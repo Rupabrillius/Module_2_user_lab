@@ -1,198 +1,158 @@
 services:
-
-  kitchen-api:
-
-    build: ./kitchen-api
-
-    container_name: kitchen-api
-
-    environment:
-
-      PORT: "5101"
-
-      SERVICE_NAME: "kitchen-api"
-
-      ENV: "lab"
-
-      OWNER: "${OWNER:-platform}"
-
-      VERSION: "${VERSION:-v1.3}"
-
-      CHANGE_ID: "${CHANGE_ID:-MENU-200}"
-
-      OTEL_EXPORTER_OTLP_ENDPOINT: "http://jaeger:4318"
-
-      OTEL_LOG_LEVEL: "info"
-
-      LOG_FILE: "/var/log/kitchen/app.log"
-
-    ports:
-
-      - "5101:5101"
-
-    volumes:
-
-      - ./logs:/var/log/kitchen
-
-    depends_on:
-
-      - otel-collector
- 
-  otel-collector:
-
-    image: otel/opentelemetry-collector-contrib:0.104.0
-
-    container_name: otel-collector
-
-    command: ["--config=/etc/otelcol-contrib/config.yaml"]
-
-    volumes:
-
-      - ./otel-collector/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml:ro
-
-    ports:
-
-      - "4317:4317"   # OTLP gRPC (optional)
-
-      - "4318:4318"   # OTLP HTTP
-
-    depends_on:
-
-      - jaeger
- 
-  jaeger:
-
-    image: jaegertracing/all-in-one:1.57
-
-    container_name: jaeger
-
-    environment:
-
-      - COLLECTOR_OTLP_ENABLED=true
-
-      # Configure Jaeger for /jaeger/ subpath
-
-      - QUERY_BASE_PATH=/jaeger
-
-    ports:
-
-      - "16686:16686"   # UI
-
-      - "14250:14250"   # gRPC ingest
-
-      - "14268:14268"   # HTTP ingest
- 
-  prometheus:
-
-    image: prom/prometheus:v2.54.1
-
-    container_name: prometheus
-
-    # Configure Prometheus for /prometheus/ subpath
-
+  redpanda:
+    image: redpandadata/redpanda:v24.2.18
     command:
-
-      - '--config.file=/etc/prometheus/prometheus.yml'
-
-      - '--web.external-url=http://localhost/prometheus/'
-
-      - '--web.route-prefix=/'
-
-    volumes:
-
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - "1G"
+      - --reserve-memory
+      - "0M"
+      - --node-id
+      - "0"
+      - --check=false
+      - --kafka-addr
+      - PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr
+      - PLAINTEXT://redpanda:9092
     ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster info --brokers redpanda:9092 >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 25
 
-      - "9090:9090"
-
+  console:
+    image: redpandadata/console:v2.6.0
     depends_on:
-
-      - kitchen-api
- 
-  loki:
-
-    image: grafana/loki:3.1.1
-
-    container_name: loki
-
-    command: ["-config.file=/etc/loki/config.yaml"]
-
-    volumes:
-
-      - ./loki/loki-config.yaml:/etc/loki/config.yaml:ro
-
-    ports:
-
-      - "3100:3100"
- 
-  promtail:
-
-    image: grafana/promtail:3.1.1
-
-    container_name: promtail
-
-    command: ["-config.file=/etc/promtail/config.yaml"]
-
-    volumes:
-
-      - ./promtail/promtail-config.yaml:/etc/promtail/config.yaml:ro
-
-      - ./logs:/var/log/kitchen:ro
-
-    depends_on:
-
-      - loki
- 
-  grafana:
-
-    image: grafana/grafana:11.2.0
-
-    container_name: grafana
-
+      redpanda:
+        condition: service_healthy
     environment:
-
-      GF_SECURITY_ADMIN_USER: "admin"
-
-      GF_SECURITY_ADMIN_PASSWORD: "admin"
-
-      GF_AUTH_ANONYMOUS_ENABLED: "false"
-
-      # Configure Grafana for /grafana/ subpath
-
-      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
-
-      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
-
+      KAFKA_BROKERS: redpanda:9092
     ports:
+      - "8081:8080"
 
-      - "3000:3000"
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
 
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.105.0
+    command:
+      - "--config=/etc/otel-collector-config.yml"
+      - "--feature-gates=-component.UseLocalHostAsDefaultHost"
     volumes:
-
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-
+      - ./configs/otel-collector-config.yml:/etc/otel-collector-config.yml:ro
+    ports:
+      - "4319:4317"
+      - "4320:4318"
     depends_on:
+      - jaeger
 
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes:
+      - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
       - prometheus
 
-      - loki
-
-  aiops-engine:
-
-    build: ./aiops-engine
-
-    container_name: aiops-engine
+  order-producer:
+    build:
+      context: .
+      dockerfile: services/order-producer/Dockerfile
+    env_file: .env
+    environment:
+      SERVICE_NAME: order-producer
+      METRICS_PORT: ${ORDER_PRODUCER_PORT}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
 
     ports:
+      - "9101:9101"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
 
-      - "7000:7000"
+  payment-producer:
+    build:
+      context: .
+      dockerfile: services/payment-producer/Dockerfile
+    env_file: .env
+    environment:
+      SERVICE_NAME: payment-producer
+      METRICS_PORT: ${PAYMENT_PRODUCER_PORT}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
+
+    ports:
+      - "9102:9102"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+
+  dq-gate:
+    build:
+      context: .
+      dockerfile: services/dq-gate/Dockerfile
+    env_file: .env
+    environment:
+      SERVICE_NAME: dq-gate
+      METRICS_PORT: ${DQ_GATE_PORT}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
 
     volumes:
-
-      - ./logs:/var/log/kitchen:ro
-
+      - ./configs:/configs:ro
+    ports:
+      - "9104:9104"
     depends_on:
+      redpanda:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
 
-      - kitchen-api
- 
+  stream-processor:
+    build:
+      context: .
+      dockerfile: services/stream-processor/Dockerfile
+    env_file: .env
+    environment:
+      SERVICE_NAME: stream-processor
+      METRICS_PORT: ${STREAM_PROCESSOR_PORT}
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
+
+    volumes:
+      - ./configs:/configs:ro
+    ports:
+      - "9105:9105"
+    depends_on:
+      redpanda:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
