@@ -85,7 +85,7 @@ services:
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       # Configure Grafana for /grafana/ subpath
-      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
+      GF_SERVER_ROOT_URL: "/grafana/"
       GF_SERVER_SERVE_FROM_SUB_PATH: "true"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
