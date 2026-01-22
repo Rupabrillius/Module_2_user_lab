@@ -1,0 +1,22 @@
+domains:
+  orders:
+    owner: "smartdine-orders-team"
+    topic: "smartdine.orders"
+    contract: "/configs/contracts/orders.schema.json"
+
+  payments:
+    owner: "smartdine-payments-team"
+    topic: "smartdine.payments"
+    contract: "/configs/contracts/payments.schema.json"
+
+enriched:
+  owner: "smartdine-platform-data"
+  topic: "smartdine.enriched"
+
+dq:
+  owner: "smartdine-dataops"
+  topic: "smartdine.dq"
+
+incidents:
+  owner: "smartdine-ops"
+  topic: "smartdine.incidents"

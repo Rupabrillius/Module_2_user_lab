@@ -1,0 +1,37 @@
+{
+  "title": "Module 2 (L7–L10) — SmartDine Real-Time Data Backbone",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Events Produced (orders)",
+      "datasource": "Prometheus",
+      "targets": [{ "expr": "rate(events_produced_total{domain=\"orders\"}[1m])" }],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Events Produced (payments)",
+      "datasource": "Prometheus",
+      "targets": [{ "expr": "rate(events_produced_total{domain=\"payments\"}[1m])" }],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 }
+    },
+    {
+      "type": "timeseries",
+      "title": "DQ Failures (rate)",
+      "datasource": "Prometheus",
+      "targets": [{ "expr": "rate(dq_failed_total[1m])" }],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Incident Candidates Emitted (rate)",
+      "datasource": "Prometheus",
+      "targets": [{ "expr": "rate(incidents_emitted_total[1m])" }],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
+    }
+  ]
+}

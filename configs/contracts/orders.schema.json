@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Orders Domain Payload",
+  "type": "object",
+  "required": ["order_id", "branch_id", "status", "prep_seconds"],
+  "properties": {
+    "order_id": { "type": "string" },
+    "branch_id": { "type": "string" },
+    "status": { "type": "string", "enum": ["placed", "accepted", "prepping", "ready"] },
+    "prep_seconds": { "type": "number", "minimum": 0 }
+  },
+  "additionalProperties": true
+}
