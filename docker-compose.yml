@@ -33,11 +33,16 @@ services:
         condition: service_healthy
     environment:
       KAFKA_BROKERS: redpanda:9092
+      # Configure Redpanda Console for /console/ subpath
+      SERVER_BASE_PATH: /console
     ports:
       - "8081:8080"
 
   jaeger:
     image: jaegertracing/all-in-one:1.57
+    environment:
+      # Configure Jaeger for /jaeger/ subpath
+      - QUERY_BASE_PATH=/jaeger
     ports:
       - "16686:16686"
       - "4317:4317"
@@ -56,9 +61,13 @@ services:
     depends_on:
       - jaeger
 
-
   prometheus:
     image: prom/prometheus:v2.55.1
+    # Configure Prometheus for /prometheus/ subpath
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.external-url=http://localhost/prometheus/'
+      - '--web.route-prefix=/'
     volumes:
       - ./configs/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     ports:
@@ -75,6 +84,9 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_AUTH_ANONYMOUS_ENABLED: "false"
+      # Configure Grafana for /grafana/ subpath
+      GF_SERVER_ROOT_URL: "%(protocol)s://%(domain)s/grafana/"
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
     volumes:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
@@ -90,7 +102,6 @@ services:
       SERVICE_NAME: order-producer
       METRICS_PORT: ${ORDER_PRODUCER_PORT}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
-
     ports:
       - "9101:9101"
     depends_on:
@@ -108,7 +119,6 @@ services:
       SERVICE_NAME: payment-producer
       METRICS_PORT: ${PAYMENT_PRODUCER_PORT}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
-
     ports:
       - "9102:9102"
     depends_on:
@@ -126,7 +136,6 @@ services:
       SERVICE_NAME: dq-gate
       METRICS_PORT: ${DQ_GATE_PORT}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
-
     volumes:
       - ./configs:/configs:ro
     ports:
@@ -146,7 +155,6 @@ services:
       SERVICE_NAME: stream-processor
       METRICS_PORT: ${STREAM_PROCESSOR_PORT}
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318/v1/traces
-
     volumes:
       - ./configs:/configs:ro
     ports:
